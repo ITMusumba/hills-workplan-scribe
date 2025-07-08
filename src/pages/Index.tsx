@@ -162,17 +162,23 @@ const Index = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-green-50 to-orange-50 p-4">
-      <div className="max-w-4xl mx-auto">
-        {/* Header */}
-        <div className="text-center mb-8">
-          <div className="flex items-center justify-center gap-4 mb-4">
-            <div className="text-4xl font-bold text-orange-500">7</div>
-            <div className="text-2xl font-bold text-green-600">Hills</div>
+    <div className="min-h-screen bg-gradient-to-br from-green-50 to-orange-50">
+      {/* Fixed Header with Logo */}
+      <div className="fixed top-0 left-0 right-0 bg-white/90 backdrop-blur-sm shadow-sm z-50 py-3">
+        <div className="max-w-4xl mx-auto px-4">
+          <div className="flex items-center justify-center gap-4">
+            <img src="/lovable-uploads/dd40129c-9549-475a-a6ce-058d77ecde17.png" alt="7Hills Logo" className="h-16 w-auto" />
+            <div className="text-center">
+              <h1 className="text-2xl font-bold text-gray-800">Work Plan Generator</h1>
+              <p className="text-sm text-gray-600">Clean streets, Green City</p>
+            </div>
           </div>
-          <h1 className="text-3xl font-bold text-gray-800 mb-2">Work Plan Generator</h1>
-          <p className="text-gray-600">Clean streets, Green City</p>
         </div>
+      </div>
+      
+      {/* Main Content with top padding to account for fixed header */}
+      <div className="pt-24 p-4">
+        <div className="max-w-4xl mx-auto">
 
         <Card className="shadow-lg">
           <CardHeader className="bg-gradient-to-r from-green-600 to-orange-500 text-white">
@@ -434,6 +440,7 @@ const Index = () => {
             </div>
           </CardContent>
         </Card>
+        </div>
       </div>
     </div>
   );
