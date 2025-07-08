@@ -15,6 +15,13 @@ import { toast } from '@/hooks/use-toast';
 import jsPDF from 'jspdf';
 import 'jspdf-autotable';
 
+// Extend jsPDF interface for autoTable
+declare module 'jspdf' {
+  interface jsPDF {
+    autoTable: (options: any) => void;
+  }
+}
+
 const Index = () => {
   const [formData, setFormData] = useState({
     department: '',
