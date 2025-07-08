@@ -146,6 +146,9 @@ const Index = () => {
     const pageWidth = doc.internal.pageSize.getWidth();
     const pageHeight = doc.internal.pageSize.getHeight();
 
+    // Log page dimensions for debugging
+    console.log(`PDF Page Width: ${pageWidth}mm, Height: ${pageHeight}mm`);
+
     // Add header
     doc.setFontSize(20);
     doc.setFont("helvetica", "bold");
@@ -173,8 +176,18 @@ const Index = () => {
     const rowHeight = 15;
     const headerHeight = 20;
 
-    // Column widths (total should be around pageWidth - 30 for margins)
-    const columnWidths = [30, 25, 40, 50, 40, 40, 50, 30]; // Day, Date, Location, Activities, Output, Tools, Comments, Pictures
+    // Column widths (total should equal pageWidth - 30 for margins)
+    const totalWidth = pageWidth - 30; // 30mm for margins (15mm on each side)
+    const columnWidths = [
+      Math.floor(totalWidth * 0.09), // Day (9%)
+      Math.floor(totalWidth * 0.08), // Date (8%)
+      Math.floor(totalWidth * 0.13), // Location (13%)
+      Math.floor(totalWidth * 0.17), // Activities (17%)
+      Math.floor(totalWidth * 0.13), // Output (13%)
+      Math.floor(totalWidth * 0.13), // Tools (13%)
+      Math.floor(totalWidth * 0.17), // Comments (17%)
+      Math.floor(totalWidth * 0.1), // Pictures (10%)
+    ];
     const headers = [
       "Day",
       "Date",
@@ -223,14 +236,14 @@ const Index = () => {
     doc.setFont("helvetica", "bold");
     doc.setFontSize(10);
 
-    // Draw header background
-    doc.rect(
-      startX,
-      startY,
-      columnWidths.reduce((a, b) => a + b, 0),
-      headerHeight,
-      "F"
+    // Calculate actual table width (sum of all column widths)
+    const actualTableWidth = columnWidths.reduce(
+      (sum, width) => sum + width,
+      0
     );
+
+    // Draw header background
+    doc.rect(startX, startY, actualTableWidth, headerHeight, "F");
 
     // Draw header borders and text
     headers.forEach((header, index) => {
@@ -292,13 +305,7 @@ const Index = () => {
       // Alternate row background
       if (index % 2 === 1) {
         doc.setFillColor(245, 245, 245);
-        doc.rect(
-          startX,
-          rowY,
-          columnWidths.reduce((a, b) => a + b, 0),
-          rowHeight,
-          "F"
-        );
+        doc.rect(startX, rowY, actualTableWidth, rowHeight, "F");
       }
 
       // Draw cell borders and text
