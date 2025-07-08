@@ -8,36 +8,51 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Textarea } from '@/components/ui/textarea';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { CalendarIcon, FileText, Upload, Download } from 'lucide-react';
-import { format } from 'date-fns';
+import { CalendarIcon, FileText, Upload, Download, AlertCircle } from 'lucide-react';
+import { format, startOfWeek, addDays, getYear, getMonth } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { toast } from '@/hooks/use-toast';
-import jsPDF from 'jspdf';
-import 'jspdf-autotable';
+import { Document, Packer, Paragraph, Table, TableRow, TableCell, WidthType, TextRun, AlignmentType, HeadingLevel } from 'docx';
+import { saveAs } from 'file-saver';
 
-// Extend jsPDF interface for autoTable
-declare module 'jspdf' {
-  interface jsPDF {
-    autoTable: (options: any) => void;
-  }
-}
 
 const Index = () => {
-  const [formData, setFormData] = useState({
-    department: '',
-    date: new Date(),
-    location: '',
-    activities: '',
-    outputType: '',
-    outputLength: '',
-    outputWidth: '',
-    outputDepth: '',
-    vehicleType: '',
-    tripCount: '',
-    tools: '',
-    comments: '',
-    pictures: []
+  const [selectedWeek, setSelectedWeek] = useState(new Date());
+  const [department, setDepartment] = useState('');
+  const [weekData, setWeekData] = useState(() => {
+    const days = [];
+    for (let i = 0; i < 7; i++) {
+      days.push({
+        location: '',
+        activities: '',
+        outputType: '',
+        outputLength: '',
+        outputWidth: '',
+        outputDepth: '',
+        vehicleType: '',
+        tripCount: '',
+        tools: '',
+        comments: '',
+        pictures: []
+      });
+    }
+    return days;
   });
+
+  const getWeekDays = () => {
+    const sunday = startOfWeek(selectedWeek, { weekStartsOn: 0 });
+    return Array.from({ length: 7 }, (_, i) => addDays(sunday, i));
+  };
+
+  const getWeekInfo = () => {
+    const days = getWeekDays();
+    const startDate = days[0];
+    const endDate = days[6];
+    const year = getYear(startDate);
+    const month = format(startDate, 'MMMM');
+    const dateRange = `${format(startDate, 'dd')}-${format(endDate, 'dd')}`;
+    return { year, month, dateRange, days };
+  };
 
   const departments = [
     'Drainage',
@@ -63,103 +78,216 @@ const Index = () => {
     'Loaders': ['Trucks', 'Tractors', 'Loading equipment', 'Safety gear']
   };
 
-  const handleInputChange = (field, value) => {
-    setFormData(prev => ({
-      ...prev,
-      [field]: value
-    }));
+  const handleDayDataChange = (dayIndex, field, value) => {
+    setWeekData(prev => {
+      const newData = [...prev];
+      newData[dayIndex] = {
+        ...newData[dayIndex],
+        [field]: value
+      };
+      return newData;
+    });
   };
 
-  const handleFileUpload = (event) => {
+  const handleFileUpload = (dayIndex, event) => {
     const files = Array.from(event.target.files);
-    setFormData(prev => ({
-      ...prev,
-      pictures: [...prev.pictures, ...files]
-    }));
+    handleDayDataChange(dayIndex, 'pictures', [...weekData[dayIndex].pictures, ...files]);
   };
 
-  const generatePDF = () => {
-    if (!formData.department || !formData.location || !formData.activities) {
+  const generateWordDocument = async () => {
+    if (!department) {
       toast({
         title: "Missing Information",
-        description: "Please fill in all required fields: department, location, and activities.",
+        description: "Please select a department.",
         variant: "destructive"
       });
       return;
     }
 
-    const doc = new jsPDF('landscape');
+    const { year, month, dateRange, days } = getWeekInfo();
+    const filledDays = weekData.filter(day => day.location && day.activities).length;
     
-    // Add logo (placeholder for now - you can replace with actual logo)
-    doc.setFontSize(20);
-    doc.setFont('helvetica', 'bold');
-    doc.text('7HILLS', 20, 25);
-    doc.setFontSize(12);
-    doc.setFont('helvetica', 'normal');
-    doc.text('Clean streets, Green City', 20, 32);
-
-    // Title
-    doc.setFontSize(16);
-    doc.setFont('helvetica', 'bold');
-    doc.text(`${formData.department.toUpperCase()} DIVISION WEEKLY WORK-PLAN AND REPORT`, 20, 50);
-    doc.text(`(WEEK: ${format(formData.date, 'MMM dd-dd')})`, 20, 60);
-
-    // Prepare table data
-    const tableData = [];
-    let output = '';
-    
-    if (formData.outputType === 'area') {
-      output = `${formData.outputLength}m×${formData.outputWidth}m`;
-    } else if (formData.outputType === 'volume') {
-      output = `${formData.outputLength}m×${formData.outputWidth}m×${formData.outputDepth}m`;
-    } else if (formData.outputType === 'trips') {
-      output = `${formData.tripCount} trips (${formData.vehicleType})`;
+    if (filledDays === 0) {
+      toast({
+        title: "No Data Entered",
+        description: "Please enter data for at least one day of the week.",
+        variant: "destructive"
+      });
+      return;
     }
 
-    tableData.push([
-      format(formData.date, 'dd.MM'),
-      formData.location,
-      formData.activities,
-      output,
-      formData.tools,
-      formData.comments,
-      'See attached'
-    ]);
-
-    // Create table
-    doc.autoTable({
-      head: [['Day', 'Date', 'Location', 'Activities', 'Output', 'Tools', 'Comments', 'Pictures']],
-      body: tableData,
-      startY: 75,
-      styles: {
-        fontSize: 10,
-        cellPadding: 3,
-      },
-      headStyles: {
-        fillColor: [255, 193, 7],
-        textColor: [0, 0, 0],
-        fontStyle: 'bold'
-      },
-      columnStyles: {
-        0: { cellWidth: 25 },
-        1: { cellWidth: 25 },
-        2: { cellWidth: 40 },
-        3: { cellWidth: 50 },
-        4: { cellWidth: 40 },
-        5: { cellWidth: 40 },
-        6: { cellWidth: 50 },
-        7: { cellWidth: 30 }
+    // Create table rows for each day
+    const tableRows = days.map((day, index) => {
+      const dayData = weekData[index];
+      let output = '';
+      
+      if (dayData.outputType === 'area' && dayData.outputLength && dayData.outputWidth) {
+        output = `${dayData.outputLength}m×${dayData.outputWidth}m`;
+      } else if (dayData.outputType === 'volume' && dayData.outputLength && dayData.outputWidth && dayData.outputDepth) {
+        output = `${dayData.outputLength}m×${dayData.outputWidth}m×${dayData.outputDepth}m`;
+      } else if (dayData.outputType === 'trips' && dayData.tripCount && dayData.vehicleType) {
+        output = `${dayData.tripCount} trips (${dayData.vehicleType})`;
       }
+
+      return new TableRow({
+        children: [
+          new TableCell({
+            children: [new Paragraph(format(day, 'EEEE'))],
+            width: { size: 12, type: WidthType.PERCENTAGE }
+          }),
+          new TableCell({
+            children: [new Paragraph(format(day, 'dd.MM'))],
+            width: { size: 12, type: WidthType.PERCENTAGE }
+          }),
+          new TableCell({
+            children: [new Paragraph(dayData.location || '')],
+            width: { size: 15, type: WidthType.PERCENTAGE }
+          }),
+          new TableCell({
+            children: [new Paragraph(dayData.activities || '')],
+            width: { size: 18, type: WidthType.PERCENTAGE }
+          }),
+          new TableCell({
+            children: [new Paragraph(output)],
+            width: { size: 15, type: WidthType.PERCENTAGE }
+          }),
+          new TableCell({
+            children: [new Paragraph(dayData.tools || '')],
+            width: { size: 15, type: WidthType.PERCENTAGE }
+          }),
+          new TableCell({
+            children: [new Paragraph(dayData.comments || '')],
+            width: { size: 18, type: WidthType.PERCENTAGE }
+          }),
+          new TableCell({
+            children: [new Paragraph(dayData.pictures.length > 0 ? 'See attached' : '')],
+            width: { size: 10, type: WidthType.PERCENTAGE }
+          })
+        ]
+      });
     });
 
-    // Save the PDF
-    doc.save(`${formData.department}_Work_Plan_${format(formData.date, 'yyyy-MM-dd')}.pdf`);
+    // Create the document
+    const doc = new Document({
+      sections: [{
+        properties: {
+          page: {
+            margin: {
+              top: 720,
+              right: 720,
+              bottom: 720,
+              left: 720,
+            },
+          },
+        },
+        children: [
+          // Header
+          new Paragraph({
+            children: [
+              new TextRun({
+                text: "7HILLS",
+                bold: true,
+                size: 32,
+              })
+            ],
+            alignment: AlignmentType.LEFT,
+          }),
+          new Paragraph({
+            children: [
+              new TextRun({
+                text: "Clean streets, Green City",
+                size: 20,
+              })
+            ],
+            alignment: AlignmentType.LEFT,
+          }),
+          new Paragraph({
+            children: [new TextRun("")], // Spacer
+          }),
+          // Title
+          new Paragraph({
+            children: [
+              new TextRun({
+                text: `${department.toUpperCase()} DIVISION WEEKLY WORK-PLAN AND REPORT`,
+                bold: true,
+                size: 24,
+              })
+            ],
+            alignment: AlignmentType.CENTER,
+          }),
+          new Paragraph({
+            children: [
+              new TextRun({
+                text: `YEAR: ${year} | MONTH: ${month} | WEEK: ${dateRange}`,
+                bold: true,
+                size: 20,
+              })
+            ],
+            alignment: AlignmentType.CENTER,
+          }),
+          new Paragraph({
+            children: [new TextRun("")], // Spacer
+          }),
+          // Table
+          new Table({
+            width: { size: 100, type: WidthType.PERCENTAGE },
+            rows: [
+              // Header row
+              new TableRow({
+                children: [
+                  new TableCell({
+                    children: [new Paragraph({ text: "Day", heading: HeadingLevel.HEADING_1 })],
+                    width: { size: 12, type: WidthType.PERCENTAGE }
+                  }),
+                  new TableCell({
+                    children: [new Paragraph({ text: "Date", heading: HeadingLevel.HEADING_1 })],
+                    width: { size: 12, type: WidthType.PERCENTAGE }
+                  }),
+                  new TableCell({
+                    children: [new Paragraph({ text: "Location", heading: HeadingLevel.HEADING_1 })],
+                    width: { size: 15, type: WidthType.PERCENTAGE }
+                  }),
+                  new TableCell({
+                    children: [new Paragraph({ text: "Activities", heading: HeadingLevel.HEADING_1 })],
+                    width: { size: 18, type: WidthType.PERCENTAGE }
+                  }),
+                  new TableCell({
+                    children: [new Paragraph({ text: "Output", heading: HeadingLevel.HEADING_1 })],
+                    width: { size: 15, type: WidthType.PERCENTAGE }
+                  }),
+                  new TableCell({
+                    children: [new Paragraph({ text: "Tools", heading: HeadingLevel.HEADING_1 })],
+                    width: { size: 15, type: WidthType.PERCENTAGE }
+                  }),
+                  new TableCell({
+                    children: [new Paragraph({ text: "Comments", heading: HeadingLevel.HEADING_1 })],
+                    width: { size: 18, type: WidthType.PERCENTAGE }
+                  }),
+                  new TableCell({
+                    children: [new Paragraph({ text: "Pictures", heading: HeadingLevel.HEADING_1 })],
+                    width: { size: 10, type: WidthType.PERCENTAGE }
+                  })
+                ]
+              }),
+              ...tableRows
+            ]
+          })
+        ]
+      }]
+    });
+
+    // Generate and save the document
+    const blob = await Packer.toBlob(doc);
+    saveAs(blob, `${department}_Work_Plan_${year}_${month}_Week_${dateRange}.docx`);
     
     toast({
-      title: "PDF Generated Successfully",
+      title: "Word Document Generated Successfully",
       description: "Your work plan report has been downloaded.",
     });
   };
+
+  const { year, month, dateRange, days } = getWeekInfo();
+  const filledDays = weekData.filter(day => day.location && day.activities).length;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-green-50 to-orange-50">
@@ -188,11 +316,25 @@ const Index = () => {
             </CardTitle>
           </CardHeader>
           <CardContent className="p-6 space-y-6">
+            {/* Week Information Display */}
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+              <div className="flex items-center gap-2 mb-2">
+                <AlertCircle className="w-5 h-5 text-blue-600" />
+                <h3 className="font-semibold text-blue-800">Week Information</h3>
+              </div>
+              <p className="text-blue-700">
+                <strong>Year:</strong> {year} | <strong>Month:</strong> {month} | <strong>Week Range:</strong> {dateRange}
+              </p>
+              <p className="text-blue-600 text-sm mt-2">
+                Please fill in data for all 7 days of the week. Currently filled: {filledDays}/7 days
+              </p>
+            </div>
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {/* Department Selection */}
               <div className="space-y-2">
                 <Label htmlFor="department">Department *</Label>
-                <Select value={formData.department} onValueChange={(value) => handleInputChange('department', value)}>
+                <Select value={department} onValueChange={setDepartment}>
                   <SelectTrigger>
                     <SelectValue placeholder="Select department" />
                   </SelectTrigger>
@@ -204,238 +346,252 @@ const Index = () => {
                 </Select>
               </div>
 
-              {/* Date Selection */}
+              {/* Week Selection */}
               <div className="space-y-2">
-                <Label>Date *</Label>
+                <Label>Select Week *</Label>
                 <Popover>
                   <PopoverTrigger asChild>
                     <Button
                       variant="outline"
                       className={cn(
                         "w-full justify-start text-left font-normal",
-                        !formData.date && "text-muted-foreground"
+                        !selectedWeek && "text-muted-foreground"
                       )}
                     >
                       <CalendarIcon className="mr-2 h-4 w-4" />
-                      {formData.date ? format(formData.date, "PPP") : <span>Pick a date</span>}
+                      {selectedWeek ? format(selectedWeek, "PPP") : <span>Pick a date</span>}
                     </Button>
                   </PopoverTrigger>
                   <PopoverContent className="w-auto p-0">
                     <Calendar
                       mode="single"
-                      selected={formData.date}
-                      onSelect={(date) => handleInputChange('date', date)}
+                      selected={selectedWeek}
+                      onSelect={(date) => setSelectedWeek(date)}
                       initialFocus
                       className="pointer-events-auto"
                     />
                   </PopoverContent>
                 </Popover>
               </div>
-
-              {/* Location */}
-              <div className="space-y-2">
-                <Label htmlFor="location">Location *</Label>
-                <Input
-                  id="location"
-                  value={formData.location}
-                  onChange={(e) => handleInputChange('location', e.target.value)}
-                  placeholder="Enter work location"
-                />
-              </div>
-
-              {/* Activities */}
-              <div className="space-y-2">
-                <Label htmlFor="activities">Activities *</Label>
-                <Select value={formData.activities} onValueChange={(value) => handleInputChange('activities', value)}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select activity" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {formData.department && commonActivities[formData.department]?.map(activity => (
-                      <SelectItem key={activity} value={activity}>{activity}</SelectItem>
-                    ))}
-                    <SelectItem value="custom">Custom Activity</SelectItem>
-                  </SelectContent>
-                </Select>
-                {formData.activities === 'custom' && (
-                  <Input
-                    placeholder="Enter custom activity"
-                    onChange={(e) => handleInputChange('activities', e.target.value)}
-                  />
-                )}
-              </div>
-
-              {/* Output Type */}
-              <div className="space-y-2">
-                <Label htmlFor="outputType">Output Type</Label>
-                <Select value={formData.outputType} onValueChange={(value) => handleInputChange('outputType', value)}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select output type" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="area">Area (Length × Width)</SelectItem>
-                    <SelectItem value="volume">Volume (Length × Width × Depth)</SelectItem>
-                    <SelectItem value="trips">Number of Trips</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              {/* Dynamic Output Fields */}
-              {formData.outputType === 'area' && (
-                <>
-                  <div className="space-y-2">
-                    <Label htmlFor="length">Length (m)</Label>
-                    <Input
-                      id="length"
-                      type="number"
-                      value={formData.outputLength}
-                      onChange={(e) => handleInputChange('outputLength', e.target.value)}
-                      placeholder="Enter length"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="width">Width (m)</Label>
-                    <Input
-                      id="width"
-                      type="number"
-                      value={formData.outputWidth}
-                      onChange={(e) => handleInputChange('outputWidth', e.target.value)}
-                      placeholder="Enter width"
-                    />
-                  </div>
-                </>
-              )}
-
-              {formData.outputType === 'volume' && (
-                <>
-                  <div className="space-y-2">
-                    <Label htmlFor="length">Length (m)</Label>
-                    <Input
-                      id="length"
-                      type="number"
-                      value={formData.outputLength}
-                      onChange={(e) => handleInputChange('outputLength', e.target.value)}
-                      placeholder="Enter length"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="width">Width (m)</Label>
-                    <Input
-                      id="width"
-                      type="number"
-                      value={formData.outputWidth}
-                      onChange={(e) => handleInputChange('outputWidth', e.target.value)}
-                      placeholder="Enter width"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="depth">Depth/Height (m)</Label>
-                    <Input
-                      id="depth"
-                      type="number"
-                      value={formData.outputDepth}
-                      onChange={(e) => handleInputChange('outputDepth', e.target.value)}
-                      placeholder="Enter depth/height"
-                    />
-                  </div>
-                </>
-              )}
-
-              {formData.outputType === 'trips' && (
-                <>
-                  <div className="space-y-2">
-                    <Label htmlFor="vehicleType">Vehicle Type</Label>
-                    <Select value={formData.vehicleType} onValueChange={(value) => handleInputChange('vehicleType', value)}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select vehicle" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="truck">Truck</SelectItem>
-                        <SelectItem value="tractor">Tractor</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="tripCount">Number of Trips</Label>
-                    <Input
-                      id="tripCount"
-                      type="number"
-                      value={formData.tripCount}
-                      onChange={(e) => handleInputChange('tripCount', e.target.value)}
-                      placeholder="Enter number of trips"
-                    />
-                  </div>
-                </>
-              )}
-
-              {/* Tools */}
-              <div className="space-y-2">
-                <Label htmlFor="tools">Tools Used</Label>
-                <Select value={formData.tools} onValueChange={(value) => handleInputChange('tools', value)}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select tools" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {formData.department && commonTools[formData.department]?.map(tool => (
-                      <SelectItem key={tool} value={tool}>{tool}</SelectItem>
-                    ))}
-                    <SelectItem value="custom">Custom Tools</SelectItem>
-                  </SelectContent>
-                </Select>
-                {formData.tools === 'custom' && (
-                  <Input
-                    placeholder="Enter custom tools"
-                    onChange={(e) => handleInputChange('tools', e.target.value)}
-                  />
-                )}
-              </div>
             </div>
 
-            {/* Comments */}
-            <div className="space-y-2">
-              <Label htmlFor="comments">Comments</Label>
-              <Textarea
-                id="comments"
-                value={formData.comments}
-                onChange={(e) => handleInputChange('comments', e.target.value)}
-                placeholder="Enter any additional comments"
-                rows={3}
-              />
+            {/* Daily Data Entry */}
+            <div className="space-y-4">
+              <h3 className="text-lg font-semibold text-gray-800">Daily Work Plan Data</h3>
+              {days.map((day, dayIndex) => {
+                const dayData = weekData[dayIndex];
+                const isDayFilled = dayData.location && dayData.activities;
+                
+                return (
+                  <Card key={dayIndex} className={`border-2 ${isDayFilled ? 'border-green-200 bg-green-50' : 'border-gray-200'}`}>
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-base flex items-center justify-between">
+                        <span>{format(day, 'EEEE, MMM dd')}</span>
+                        {isDayFilled && <span className="text-green-600 text-sm">✓ Complete</span>}
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {/* Location */}
+                        <div className="space-y-2">
+                          <Label>Location *</Label>
+                          <Input
+                            value={dayData.location}
+                            onChange={(e) => handleDayDataChange(dayIndex, 'location', e.target.value)}
+                            placeholder="Enter work location"
+                          />
+                        </div>
+
+                        {/* Activities */}
+                        <div className="space-y-2">
+                          <Label>Activities *</Label>
+                          <Select value={dayData.activities} onValueChange={(value) => handleDayDataChange(dayIndex, 'activities', value)}>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select activity" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {department && commonActivities[department]?.map(activity => (
+                                <SelectItem key={activity} value={activity}>{activity}</SelectItem>
+                              ))}
+                              <SelectItem value="custom">Custom Activity</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          {dayData.activities === 'custom' && (
+                            <Input
+                              placeholder="Enter custom activity"
+                              onChange={(e) => handleDayDataChange(dayIndex, 'activities', e.target.value)}
+                            />
+                          )}
+                        </div>
+
+                        {/* Output Type */}
+                        <div className="space-y-2">
+                          <Label>Output Type</Label>
+                          <Select value={dayData.outputType} onValueChange={(value) => handleDayDataChange(dayIndex, 'outputType', value)}>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select output type" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="area">Area (Length × Width)</SelectItem>
+                              <SelectItem value="volume">Volume (Length × Width × Depth)</SelectItem>
+                              <SelectItem value="trips">Number of Trips</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+
+                        {/* Dynamic Output Fields */}
+                        {dayData.outputType === 'area' && (
+                          <>
+                            <div className="space-y-2">
+                              <Label>Length (m)</Label>
+                              <Input
+                                type="number"
+                                value={dayData.outputLength}
+                                onChange={(e) => handleDayDataChange(dayIndex, 'outputLength', e.target.value)}
+                                placeholder="Enter length"
+                              />
+                            </div>
+                            <div className="space-y-2">
+                              <Label>Width (m)</Label>
+                              <Input
+                                type="number"
+                                value={dayData.outputWidth}
+                                onChange={(e) => handleDayDataChange(dayIndex, 'outputWidth', e.target.value)}
+                                placeholder="Enter width"
+                              />
+                            </div>
+                          </>
+                        )}
+
+                        {dayData.outputType === 'volume' && (
+                          <>
+                            <div className="space-y-2">
+                              <Label>Length (m)</Label>
+                              <Input
+                                type="number"
+                                value={dayData.outputLength}
+                                onChange={(e) => handleDayDataChange(dayIndex, 'outputLength', e.target.value)}
+                                placeholder="Enter length"
+                              />
+                            </div>
+                            <div className="space-y-2">
+                              <Label>Width (m)</Label>
+                              <Input
+                                type="number"
+                                value={dayData.outputWidth}
+                                onChange={(e) => handleDayDataChange(dayIndex, 'outputWidth', e.target.value)}
+                                placeholder="Enter width"
+                              />
+                            </div>
+                            <div className="space-y-2">
+                              <Label>Depth/Height (m)</Label>
+                              <Input
+                                type="number"
+                                value={dayData.outputDepth}
+                                onChange={(e) => handleDayDataChange(dayIndex, 'outputDepth', e.target.value)}
+                                placeholder="Enter depth/height"
+                              />
+                            </div>
+                          </>
+                        )}
+
+                        {dayData.outputType === 'trips' && (
+                          <>
+                            <div className="space-y-2">
+                              <Label>Vehicle Type</Label>
+                              <Select value={dayData.vehicleType} onValueChange={(value) => handleDayDataChange(dayIndex, 'vehicleType', value)}>
+                                <SelectTrigger>
+                                  <SelectValue placeholder="Select vehicle" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="truck">Truck</SelectItem>
+                                  <SelectItem value="tractor">Tractor</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </div>
+                            <div className="space-y-2">
+                              <Label>Number of Trips</Label>
+                              <Input
+                                type="number"
+                                value={dayData.tripCount}
+                                onChange={(e) => handleDayDataChange(dayIndex, 'tripCount', e.target.value)}
+                                placeholder="Enter number of trips"
+                              />
+                            </div>
+                          </>
+                        )}
+
+                        {/* Tools */}
+                        <div className="space-y-2">
+                          <Label>Tools Used</Label>
+                          <Select value={dayData.tools} onValueChange={(value) => handleDayDataChange(dayIndex, 'tools', value)}>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select tools" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {department && commonTools[department]?.map(tool => (
+                                <SelectItem key={tool} value={tool}>{tool}</SelectItem>
+                              ))}
+                              <SelectItem value="custom">Custom Tools</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          {dayData.tools === 'custom' && (
+                            <Input
+                              placeholder="Enter custom tools"
+                              onChange={(e) => handleDayDataChange(dayIndex, 'tools', e.target.value)}
+                            />
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Comments */}
+                      <div className="space-y-2">
+                        <Label>Comments</Label>
+                        <Textarea
+                          value={dayData.comments}
+                          onChange={(e) => handleDayDataChange(dayIndex, 'comments', e.target.value)}
+                          placeholder="Enter any additional comments"
+                          rows={2}
+                        />
+                      </div>
+
+                      {/* Picture Upload */}
+                      <div className="space-y-2">
+                        <Label>Upload Pictures</Label>
+                        <div className="border-2 border-dashed border-gray-300 rounded-lg p-3 text-center">
+                          <Upload className="w-6 h-6 mx-auto mb-1 text-gray-400" />
+                          <input
+                            type="file"
+                            id={`pictures-${dayIndex}`}
+                            multiple
+                            accept="image/*"
+                            onChange={(e) => handleFileUpload(dayIndex, e)}
+                            className="hidden"
+                          />
+                          <label htmlFor={`pictures-${dayIndex}`} className="cursor-pointer text-blue-600 hover:text-blue-800 text-sm">
+                            Click to upload pictures
+                          </label>
+                          {dayData.pictures.length > 0 && (
+                            <p className="text-sm text-green-600 mt-1">
+                              {dayData.pictures.length} file(s) selected
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+              })}
             </div>
 
-            {/* Picture Upload */}
-            <div className="space-y-2">
-              <Label htmlFor="pictures">Upload Pictures</Label>
-              <div className="border-2 border-dashed border-gray-300 rounded-lg p-4 text-center">
-                <Upload className="w-8 h-8 mx-auto mb-2 text-gray-400" />
-                <input
-                  type="file"
-                  id="pictures"
-                  multiple
-                  accept="image/*"
-                  onChange={handleFileUpload}
-                  className="hidden"
-                />
-                <label htmlFor="pictures" className="cursor-pointer text-blue-600 hover:text-blue-800">
-                  Click to upload pictures
-                </label>
-                <p className="text-sm text-gray-500 mt-1">or drag and drop</p>
-                {formData.pictures.length > 0 && (
-                  <p className="text-sm text-green-600 mt-2">
-                    {formData.pictures.length} file(s) selected
-                  </p>
-                )}
-              </div>
-            </div>
-
-            {/* Generate PDF Button */}
+            {/* Generate Document Button */}
             <div className="flex justify-center pt-4">
               <Button 
-                onClick={generatePDF}
+                onClick={generateWordDocument}
                 className="bg-gradient-to-r from-green-600 to-orange-500 hover:from-green-700 hover:to-orange-600 text-white px-8 py-3 text-lg"
               >
                 <Download className="w-5 h-5 mr-2" />
-                Generate PDF Report
+                Generate Word Document
               </Button>
             </div>
           </CardContent>
