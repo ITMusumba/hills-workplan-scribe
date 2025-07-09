@@ -130,7 +130,7 @@ const Index = () => {
     // Add title
     doc.setFontSize(16);
     doc.setFont("helvetica", "bold");
-    const title = `${department.toUpperCase()} DIVISION WEEKLY WORK-PLAN AND REPORT`;
+    const title = `${division.toUpperCase()}: ${department.toUpperCase()} UNIT / WEEKLY WORK-PLAN AND REPORT`;
     const titleWidth = doc.getTextWidth(title);
     doc.text(title, (pageWidth - titleWidth) / 2, 45);
     doc.setFontSize(12);
@@ -162,7 +162,7 @@ const Index = () => {
     // Comments (17%)
     Math.floor(totalWidth * 0.1) // Pictures (10%)
     ];
-    const headers = ["Day", "Date", "Location", "Activities", "Output", "Tools", "Comments", "Pictures"];
+    const headers = ["Day", "Date", "Location", "Activities", "Output", "Tools", "Comment & Sign", "Pictures"];
 
     // Function to draw table borders
     const drawTableBorders = (x, y, width, height) => {
@@ -510,7 +510,7 @@ const Index = () => {
 
                         {/* Comments */}
                         <div className="space-y-2">
-                          <Label>Comments</Label>
+                          <Label>Comment & Sign</Label>
                           <Textarea value={dayData.comments} onChange={e => handleDayDataChange(dayIndex, "comments", e.target.value)} placeholder="Enter any additional comments" rows={2} />
                         </div>
 
