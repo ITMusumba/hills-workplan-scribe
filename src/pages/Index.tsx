@@ -33,6 +33,7 @@ import jsPDF from "jspdf";
 
 const Index = () => {
   const [selectedWeek, setSelectedWeek] = useState(new Date());
+  const [division, setDivision] = useState("");
   const [department, setDepartment] = useState("");
   const [weekData, setWeekData] = useState(() => {
     const days = [];
@@ -40,6 +41,7 @@ const Index = () => {
       days.push({
         location: "",
         activities: "",
+        customActivity: "",
         outputType: "",
         outputLength: "",
         outputWidth: "",
@@ -47,8 +49,8 @@ const Index = () => {
         vehicleType: "",
         tripCount: "",
         tools: "",
+        customTools: "",
         comments: "",
-        pictures: [],
       });
     }
     return days;
@@ -68,6 +70,14 @@ const Index = () => {
     const dateRange = `${format(startDate, "dd")}-${format(endDate, "dd")}`;
     return { year, month, dateRange, days };
   };
+
+  const divisions = [
+    "Kawempe",
+    "Kampala Central", 
+    "Rubaga",
+    "Makindye",
+    "Nakawa",
+  ];
 
   const departments = [
     "Drainage",
@@ -109,19 +119,12 @@ const Index = () => {
     });
   };
 
-  const handleFileUpload = (dayIndex, event) => {
-    const files = Array.from(event.target.files);
-    handleDayDataChange(dayIndex, "pictures", [
-      ...weekData[dayIndex].pictures,
-      ...files,
-    ]);
-  };
 
   const generatePDFDocument = () => {
-    if (!department) {
+    if (!division || !department) {
       toast({
         title: "Missing Information",
-        description: "Please select a department.",
+        description: "Please select both division and department.",
         variant: "destructive",
       });
       return;
@@ -129,7 +132,7 @@ const Index = () => {
 
     const { year, month, dateRange, days } = getWeekInfo();
     const filledDays = weekData.filter(
-      (day) => day.location && day.activities
+      (day) => day.location && (day.activities || day.customActivity)
     ).length;
 
     if (filledDays === 0) {
@@ -295,11 +298,11 @@ const Index = () => {
         format(day, "EEEE"),
         format(day, "dd.MM"),
         dayData.location || "",
-        dayData.activities || "",
+        dayData.activities || dayData.customActivity || "",
         output,
-        dayData.tools || "",
+        dayData.tools || dayData.customTools || "",
         dayData.comments || "",
-        dayData.pictures.length > 0 ? "See attached" : "",
+        "See report",
       ];
 
       // Alternate row background
@@ -346,7 +349,7 @@ const Index = () => {
 
   const { year, month, dateRange, days } = getWeekInfo();
   const filledDays = weekData.filter(
-    (day) => day.location && day.activities
+    (day) => day.location && (day.activities || day.customActivity)
   ).length;
 
   return (
@@ -399,7 +402,24 @@ const Index = () => {
                 </p>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                {/* Division Selection */}
+                <div className="space-y-2">
+                  <Label htmlFor="division">Division *</Label>
+                  <Select value={division} onValueChange={setDivision}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select division" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {divisions.map((div) => (
+                        <SelectItem key={div} value={div}>
+                          {div}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
                 {/* Department Selection */}
                 <div className="space-y-2">
                   <Label htmlFor="department">Department *</Label>
@@ -457,7 +477,7 @@ const Index = () => {
                 </h3>
                 {days.map((day, dayIndex) => {
                   const dayData = weekData[dayIndex];
-                  const isDayFilled = dayData.location && dayData.activities;
+                  const isDayFilled = dayData.location && (dayData.activities || dayData.customActivity);
 
                   return (
                     <Card
@@ -531,11 +551,12 @@ const Index = () => {
                             </Select>
                             {dayData.activities === "custom" && (
                               <Input
+                                value={dayData.customActivity}
                                 placeholder="Enter custom activity"
                                 onChange={(e) =>
                                   handleDayDataChange(
                                     dayIndex,
-                                    "activities",
+                                    "customActivity",
                                     e.target.value
                                   )
                                 }
@@ -728,11 +749,12 @@ const Index = () => {
                             </Select>
                             {dayData.tools === "custom" && (
                               <Input
+                                value={dayData.customTools}
                                 placeholder="Enter custom tools"
                                 onChange={(e) =>
                                   handleDayDataChange(
                                     dayIndex,
-                                    "tools",
+                                    "customTools",
                                     e.target.value
                                   )
                                 }
@@ -758,32 +780,6 @@ const Index = () => {
                           />
                         </div>
 
-                        {/* Picture Upload */}
-                        <div className="space-y-2">
-                          <Label>Upload Pictures</Label>
-                          <div className="border-2 border-dashed border-gray-300 rounded-lg p-3 text-center">
-                            <Upload className="w-6 h-6 mx-auto mb-1 text-gray-400" />
-                            <input
-                              type="file"
-                              id={`pictures-${dayIndex}`}
-                              multiple
-                              accept="image/*"
-                              onChange={(e) => handleFileUpload(dayIndex, e)}
-                              className="hidden"
-                            />
-                            <label
-                              htmlFor={`pictures-${dayIndex}`}
-                              className="cursor-pointer text-blue-600 hover:text-blue-800 text-sm"
-                            >
-                              Click to upload pictures
-                            </label>
-                            {dayData.pictures.length > 0 && (
-                              <p className="text-sm text-green-600 mt-1">
-                                {dayData.pictures.length} file(s) selected
-                              </p>
-                            )}
-                          </div>
-                        </div>
                       </CardContent>
                     </Card>
                   );
