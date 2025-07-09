@@ -359,9 +359,9 @@ const Index = () => {
         <div className="max-w-4xl mx-auto px-4">
           <div className="flex items-center justify-center gap-4">
             <img
-              src="/placeholder.svg?height=64&width=64"
+              src="/lovable-uploads/cddffb69-e0aa-433e-9cf3-8b09c0b0f5c0.png"
               alt="7Hills Logo"
-              className="h-16 w-auto"
+              className="h-12 sm:h-14 md:h-16 w-auto max-w-full object-contain"
             />
             <div className="text-center">
               <h1 className="text-2xl font-bold text-gray-800">
