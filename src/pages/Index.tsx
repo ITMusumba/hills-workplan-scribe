@@ -31,6 +31,10 @@ import { cn } from "@/lib/utils";
 import { toast } from "@/hooks/use-toast";
 import jsPDF from "jspdf";
 
+import { Capacitor } from "@capacitor/core";
+import { Filesystem, Directory } from "@capacitor/filesystem";
+import { FileViewer } from "@capacitor/file-viewer";
+
 const Index = () => {
   const [selectedWeek, setSelectedWeek] = useState(new Date());
   const [department, setDepartment] = useState("");
@@ -117,7 +121,7 @@ const Index = () => {
     ]);
   };
 
-  const generatePDFDocument = () => {
+  const generatePDFDocument = async () => {
     if (!department) {
       toast({
         title: "Missing Information",
@@ -337,6 +341,38 @@ const Index = () => {
     // Save the PDF
     const fileName = `${department}_Work_Plan_${year}_${month}_Week_${dateRange}.pdf`;
     doc.save(fileName);
+
+    if (Capacitor.isNativePlatform()) {
+      try {
+        const pdfBase64 = doc.output("datauristring");
+        // Remove the 'data:application/pdf;base64,' prefix if present
+        const base64Data = pdfBase64.split(",")[1] || pdfBase64;
+
+        const result = await Filesystem.writeFile({
+          path: fileName,
+          data: base64Data,
+          directory: Directory.Documents || Directory.ExternalStorage, // Or Directory.Downloads if preferred and available
+          recursive: true,
+        });
+
+        const resultUri = result.uri;
+        await FileViewer.openDocumentFromLocalPath({
+          path: resultUri,
+        });
+        console.log("PDF saved to device at:", result.uri);
+        toast({
+          title: `Report saved to device! Look for "${fileName}" in your device's Documents folder.`,
+        });
+        // Removed FileOpener logic as requested. User will manually open the file.
+      } catch (error) {
+        console.error("Error saving PDF:", error);
+        toast({
+          title: "Error Saving PDF",
+          description: "There was an issue saving the PDF document.",
+          variant: "destructive",
+        });
+      }
+    }
 
     toast({
       title: "PDF Document Generated Successfully",
