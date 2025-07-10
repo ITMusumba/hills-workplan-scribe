@@ -351,19 +351,24 @@ const Index = () => {
     <div className="min-h-screen bg-gradient-to-br from-green-50 to-orange-50">
       {/* Fixed Header with Logo */}
       <div className="fixed top-0 left-0 right-0 bg-white/90 backdrop-blur-sm shadow-sm z-50 py-3">
-        <div className="max-w-4xl mx-auto px-4">
-          <div className="flex items-center justify-center gap-4">
+        <div className="max-w-6xl mx-auto px-4">
+          <div className="flex items-center justify-between">
             <img
               src="/lovable-uploads/cddffb69-e0aa-433e-9cf3-8b09c0b0f5c0.png"
               alt="7Hills Logo"
               className="h-12 sm:h-14 md:h-16 w-auto max-w-full object-contain"
             />
-            <div className="text-center">
+            <div className="text-center flex-1">
               <h1 className="text-2xl font-bold text-gray-800">
                 Work Plan Generator
               </h1>
               <p className="text-sm text-gray-600">Clean streets, Green City</p>
             </div>
+            <img
+              src="/lovable-uploads/46a20213-db30-439c-8685-1a738bc7c739.png"
+              alt="Campaign Banner"
+              className="h-12 sm:h-14 md:h-16 w-auto max-w-full object-contain"
+            />
           </div>
         </div>
       </div>
