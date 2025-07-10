@@ -30,13 +30,9 @@ import { format, startOfWeek, addDays, getYear } from "date-fns";
 import { cn } from "@/lib/utils";
 import { toast } from "@/hooks/use-toast";
 import jsPDF from "jspdf";
-
-import { Capacitor } from "@capacitor/core";
-import { Filesystem, Directory } from "@capacitor/filesystem";
-import { FileViewer } from "@capacitor/file-viewer";
-
 const Index = () => {
   const [selectedWeek, setSelectedWeek] = useState(new Date());
+  const [division, setDivision] = useState("");
   const [department, setDepartment] = useState("");
   const [weekData, setWeekData] = useState(() => {
     const days = [];
@@ -44,6 +40,7 @@ const Index = () => {
       days.push({
         location: "",
         activities: "",
+        customActivity: "",
         outputType: "",
         outputLength: "",
         outputWidth: "",
@@ -51,18 +48,23 @@ const Index = () => {
         vehicleType: "",
         tripCount: "",
         tools: "",
+        customTools: "",
         comments: "",
-        pictures: [],
       });
     }
     return days;
   });
-
   const getWeekDays = () => {
-    const sunday = startOfWeek(selectedWeek, { weekStartsOn: 0 });
-    return Array.from({ length: 7 }, (_, i) => addDays(sunday, i));
+    const sunday = startOfWeek(selectedWeek, {
+      weekStartsOn: 0,
+    });
+    return Array.from(
+      {
+        length: 7,
+      },
+      (_, i) => addDays(sunday, i)
+    );
   };
-
   const getWeekInfo = () => {
     const days = getWeekDays();
     const startDate = days[0];
@@ -70,9 +72,20 @@ const Index = () => {
     const year = getYear(startDate);
     const month = format(startDate, "MMMM");
     const dateRange = `${format(startDate, "dd")}-${format(endDate, "dd")}`;
-    return { year, month, dateRange, days };
+    return {
+      year,
+      month,
+      dateRange,
+      days,
+    };
   };
-
+  const divisions = [
+    "Kawempe",
+    "Kampala Central",
+    "Rubaga",
+    "Makindye",
+    "Nakawa",
+  ];
   const departments = [
     "Drainage",
     "Sweeping",
@@ -80,7 +93,6 @@ const Index = () => {
     "Market Cleaning",
     "Loaders",
   ];
-
   const commonActivities = {
     Drainage: [
       "Garbage Collection",
@@ -93,7 +105,6 @@ const Index = () => {
     "Market Cleaning": ["Floor Cleaning", "Waste Collection", "Sanitization"],
     Loaders: ["Material Loading", "Waste Transportation", "Equipment Moving"],
   };
-
   const commonTools = {
     Drainage: ["Spades", "Fork hoes", "Hand hoes", "Wheelbarrows", "Shovels"],
     Sweeping: ["Brooms", "Dustpans", "Wheelbarrows", "Trash bags"],
@@ -101,7 +112,6 @@ const Index = () => {
     "Market Cleaning": ["Mops", "Buckets", "Disinfectants", "Cleaning cloths"],
     Loaders: ["Trucks", "Tractors", "Loading equipment", "Safety gear"],
   };
-
   const handleDayDataChange = (dayIndex, field, value) => {
     setWeekData((prev) => {
       const newData = [...prev];
@@ -112,30 +122,19 @@ const Index = () => {
       return newData;
     });
   };
-
-  const handleFileUpload = (dayIndex, event) => {
-    const files = Array.from(event.target.files);
-    handleDayDataChange(dayIndex, "pictures", [
-      ...weekData[dayIndex].pictures,
-      ...files,
-    ]);
-  };
-
-  const generatePDFDocument = async () => {
-    if (!department) {
+  const generatePDFDocument = () => {
+    if (!division || !department) {
       toast({
         title: "Missing Information",
-        description: "Please select a department.",
+        description: "Please select both division and department.",
         variant: "destructive",
       });
       return;
     }
-
     const { year, month, dateRange, days } = getWeekInfo();
     const filledDays = weekData.filter(
-      (day) => day.location && day.activities
+      (day) => day.location && (day.activities || day.customActivity)
     ).length;
-
     if (filledDays === 0) {
       toast({
         title: "No Data Entered",
@@ -157,7 +156,6 @@ const Index = () => {
     doc.setFontSize(20);
     doc.setFont("helvetica", "bold");
     doc.text("7HILLS", 20, 20);
-
     doc.setFontSize(12);
     doc.setFont("helvetica", "normal");
     doc.text("Clean streets, Green City", 20, 28);
@@ -165,10 +163,9 @@ const Index = () => {
     // Add title
     doc.setFontSize(16);
     doc.setFont("helvetica", "bold");
-    const title = `${department.toUpperCase()} DIVISION WEEKLY WORK-PLAN AND REPORT`;
+    const title = `${division.toUpperCase()}: ${department.toUpperCase()} UNIT / WEEKLY WORK-PLAN AND REPORT`;
     const titleWidth = doc.getTextWidth(title);
     doc.text(title, (pageWidth - titleWidth) / 2, 45);
-
     doc.setFontSize(12);
     const subtitle = `YEAR: ${year} | MONTH: ${month} | WEEK: ${dateRange}`;
     const subtitleWidth = doc.getTextWidth(subtitle);
@@ -183,13 +180,20 @@ const Index = () => {
     // Column widths (total should equal pageWidth - 30 for margins)
     const totalWidth = pageWidth - 30; // 30mm for margins (15mm on each side)
     const columnWidths = [
-      Math.floor(totalWidth * 0.09), // Day (9%)
-      Math.floor(totalWidth * 0.08), // Date (8%)
-      Math.floor(totalWidth * 0.13), // Location (13%)
-      Math.floor(totalWidth * 0.17), // Activities (17%)
-      Math.floor(totalWidth * 0.13), // Output (13%)
-      Math.floor(totalWidth * 0.13), // Tools (13%)
-      Math.floor(totalWidth * 0.17), // Comments (17%)
+      Math.floor(totalWidth * 0.09),
+      // Day (9%)
+      Math.floor(totalWidth * 0.08),
+      // Date (8%)
+      Math.floor(totalWidth * 0.13),
+      // Location (13%)
+      Math.floor(totalWidth * 0.17),
+      // Activities (17%)
+      Math.floor(totalWidth * 0.13),
+      // Output (13%)
+      Math.floor(totalWidth * 0.13),
+      // Tools (13%)
+      Math.floor(totalWidth * 0.17),
+      // Comments (17%)
       Math.floor(totalWidth * 0.1), // Pictures (10%)
     ];
     const headers = [
@@ -199,7 +203,7 @@ const Index = () => {
       "Activities",
       "Output",
       "Tools",
-      "Comments",
+      "Comment & Sign",
       "Pictures",
     ];
 
@@ -213,11 +217,9 @@ const Index = () => {
       const words = text.split(" ");
       const lines = [];
       let currentLine = "";
-
       words.forEach((word) => {
         const testLine = currentLine + (currentLine ? " " : "") + word;
         const testWidth = doc.getTextWidth(testLine);
-
         if (testWidth > maxWidth && currentLine) {
           lines.push(currentLine);
           currentLine = word;
@@ -225,11 +227,9 @@ const Index = () => {
           currentLine = testLine;
         }
       });
-
       if (currentLine) {
         lines.push(currentLine);
       }
-
       return lines;
     };
 
@@ -257,7 +257,6 @@ const Index = () => {
       const textWidth = doc.getTextWidth(header);
       const textX = currentX + (columnWidths[index] - textWidth) / 2;
       const textY = startY + headerHeight / 2 + 2;
-
       doc.text(header, textX, textY);
       currentX += columnWidths[index];
     });
@@ -294,16 +293,15 @@ const Index = () => {
       ) {
         output = `${dayData.tripCount} trips (${dayData.vehicleType})`;
       }
-
       const rowData = [
         format(day, "EEEE"),
         format(day, "dd.MM"),
         dayData.location || "",
-        dayData.activities || "",
+        dayData.activities || dayData.customActivity || "",
         output,
-        dayData.tools || "",
+        dayData.tools || dayData.customTools || "",
         dayData.comments || "",
-        dayData.pictures.length > 0 ? "See attached" : "",
+        "See report",
       ];
 
       // Alternate row background
@@ -333,7 +331,6 @@ const Index = () => {
             doc.text(truncatedText, textX, textY);
           }
         }
-
         currentX += columnWidths[cellIndex];
       });
     });
@@ -341,50 +338,15 @@ const Index = () => {
     // Save the PDF
     const fileName = `${department}_Work_Plan_${year}_${month}_Week_${dateRange}.pdf`;
     doc.save(fileName);
-
-    if (Capacitor.isNativePlatform()) {
-      try {
-        const pdfBase64 = doc.output("datauristring");
-        // Remove the 'data:application/pdf;base64,' prefix if present
-        const base64Data = pdfBase64.split(",")[1] || pdfBase64;
-
-        const result = await Filesystem.writeFile({
-          path: fileName,
-          data: base64Data,
-          directory: Directory.Documents || Directory.ExternalStorage, // Or Directory.Downloads if preferred and available
-          recursive: true,
-        });
-
-        const resultUri = result.uri;
-        await FileViewer.openDocumentFromLocalPath({
-          path: resultUri,
-        });
-        console.log("PDF saved to device at:", result.uri);
-        toast({
-          title: `Report saved to device! Look for "${fileName}" in your device's Documents folder.`,
-        });
-        // Removed FileOpener logic as requested. User will manually open the file.
-      } catch (error) {
-        console.error("Error saving PDF:", error);
-        toast({
-          title: "Error Saving PDF",
-          description: "There was an issue saving the PDF document.",
-          variant: "destructive",
-        });
-      }
-    }
-
     toast({
       title: "PDF Document Generated Successfully",
       description: "Your work plan report has been downloaded.",
     });
   };
-
   const { year, month, dateRange, days } = getWeekInfo();
   const filledDays = weekData.filter(
-    (day) => day.location && day.activities
+    (day) => day.location && (day.activities || day.customActivity)
   ).length;
-
   return (
     <div className="min-h-screen bg-gradient-to-br from-green-50 to-orange-50">
       {/* Fixed Header with Logo */}
@@ -392,9 +354,9 @@ const Index = () => {
         <div className="max-w-4xl mx-auto px-4">
           <div className="flex items-center justify-center gap-4">
             <img
-              src="/placeholder.svg?height=64&width=64"
+              src="/lovable-uploads/cddffb69-e0aa-433e-9cf3-8b09c0b0f5c0.png"
               alt="7Hills Logo"
-              className="h-16 w-auto"
+              className="h-12 sm:h-14 md:h-16 w-auto max-w-full object-contain"
             />
             <div className="text-center">
               <h1 className="text-2xl font-bold text-gray-800">
@@ -435,10 +397,27 @@ const Index = () => {
                 </p>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                {/* Division Selection */}
+                <div className="space-y-2">
+                  <Label htmlFor="division">Division *</Label>
+                  <Select value={division} onValueChange={setDivision}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select division" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {divisions.map((div) => (
+                        <SelectItem key={div} value={div}>
+                          {div}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
                 {/* Department Selection */}
                 <div className="space-y-2">
-                  <Label htmlFor="department">Department *</Label>
+                  <Label htmlFor="department">Unit *</Label>
                   <Select value={department} onValueChange={setDepartment}>
                     <SelectTrigger>
                       <SelectValue placeholder="Select department" />
@@ -493,8 +472,9 @@ const Index = () => {
                 </h3>
                 {days.map((day, dayIndex) => {
                   const dayData = weekData[dayIndex];
-                  const isDayFilled = dayData.location && dayData.activities;
-
+                  const isDayFilled =
+                    dayData.location &&
+                    (dayData.activities || dayData.customActivity);
                   return (
                     <Card
                       key={dayIndex}
@@ -567,11 +547,12 @@ const Index = () => {
                             </Select>
                             {dayData.activities === "custom" && (
                               <Input
+                                value={dayData.customActivity}
                                 placeholder="Enter custom activity"
                                 onChange={(e) =>
                                   handleDayDataChange(
                                     dayIndex,
-                                    "activities",
+                                    "customActivity",
                                     e.target.value
                                   )
                                 }
@@ -764,11 +745,12 @@ const Index = () => {
                             </Select>
                             {dayData.tools === "custom" && (
                               <Input
+                                value={dayData.customTools}
                                 placeholder="Enter custom tools"
                                 onChange={(e) =>
                                   handleDayDataChange(
                                     dayIndex,
-                                    "tools",
+                                    "customTools",
                                     e.target.value
                                   )
                                 }
@@ -779,7 +761,7 @@ const Index = () => {
 
                         {/* Comments */}
                         <div className="space-y-2">
-                          <Label>Comments</Label>
+                          <Label>Comment & Sign</Label>
                           <Textarea
                             value={dayData.comments}
                             onChange={(e) =>
@@ -792,33 +774,6 @@ const Index = () => {
                             placeholder="Enter any additional comments"
                             rows={2}
                           />
-                        </div>
-
-                        {/* Picture Upload */}
-                        <div className="space-y-2">
-                          <Label>Upload Pictures</Label>
-                          <div className="border-2 border-dashed border-gray-300 rounded-lg p-3 text-center">
-                            <Upload className="w-6 h-6 mx-auto mb-1 text-gray-400" />
-                            <input
-                              type="file"
-                              id={`pictures-${dayIndex}`}
-                              multiple
-                              accept="image/*"
-                              onChange={(e) => handleFileUpload(dayIndex, e)}
-                              className="hidden"
-                            />
-                            <label
-                              htmlFor={`pictures-${dayIndex}`}
-                              className="cursor-pointer text-blue-600 hover:text-blue-800 text-sm"
-                            >
-                              Click to upload pictures
-                            </label>
-                            {dayData.pictures.length > 0 && (
-                              <p className="text-sm text-green-600 mt-1">
-                                {dayData.pictures.length} file(s) selected
-                              </p>
-                            )}
-                          </div>
                         </div>
                       </CardContent>
                     </Card>
@@ -843,5 +798,4 @@ const Index = () => {
     </div>
   );
 };
-
 export default Index;
