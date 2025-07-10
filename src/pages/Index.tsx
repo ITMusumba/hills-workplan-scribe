@@ -297,9 +297,9 @@ const Index = () => {
         format(day, "EEEE"),
         format(day, "dd.MM"),
         dayData.location || "",
-        dayData.activities || dayData.customActivity || "",
+        dayData.activities === "custom" ? dayData.customActivity || "" : dayData.activities || "",
         output,
-        dayData.tools || dayData.customTools || "",
+        dayData.tools === "custom" ? dayData.customTools || "" : dayData.tools || "",
         dayData.comments || "",
         "See report",
       ];
